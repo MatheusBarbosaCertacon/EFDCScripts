@@ -10,7 +10,9 @@ const blocos = [
     { nome: 'F', link: 'https://www.vriconsulting.com.br/guias/guiasIndex.php?idGuia=559', skip: false },
     { nome: 'I', link: 'https://www.vriconsulting.com.br/guias/guiasIndex.php?idGuia=560', skip: false },
     { nome: 'M', link: 'https://www.vriconsulting.com.br/guias/guiasIndex.php?idGuia=561', skip: false },
-    { nome: 'P', link: 'https://www.vriconsulting.com.br/guias/guiasIndex.php?idGuia=562', skip: false }
+    { nome: 'P', link: 'https://www.vriconsulting.com.br/guias/guiasIndex.php?idGuia=562', skip: false },
+    { nome: '9', link: 'https://www.vriconsulting.com.br/guias/guiasIndex.php?idGuia=226', skip: false },
+
 ];
 (async () => {
     console.log("Pulando " + blocos.filter(e => e.skip).length + " blocos, processando " + blocos.filter(e => !e.skip).length)
@@ -39,7 +41,11 @@ const blocos = [
                 const rowData = [];
                 const cells = row.querySelectorAll('td');
                 cells.forEach((cell, i) => {
-                    if (i == 2) {
+                    if(bloco == "9" && i==1){
+                        rowData.push({ href: cell.querySelector("a").href, nome: cell.innerText })
+                        return;
+                    }
+                    if (i == 2 && bloco !== "9") {
                         if (cell.querySelector("a"))
                             rowData.push({ href: cell.querySelector("a").href, nome: cell.innerText })
 
@@ -60,7 +66,12 @@ const blocos = [
             if (registro[0] == "F" && registro[1] == "Identificação do Estabelecimento") {
                 registroLink = "https://www.vriconsulting.com.br/guias/guiasIndex.php?idGuia=732"
                 nomeRegistro = "F010"
-            } else {
+            }else
+            if(registro[0] == "9"){
+                registroLink = registro[1].href;
+                nomeRegistro = registro[2];
+            }
+            else {
                 registroLink = registro[2].href;
                 nomeRegistro = registro[2].nome.replace(" (*)", "");
             }
@@ -296,8 +307,11 @@ function gerarServico(registros) {
     import br.com.certacon.msprocessefdcontribuicoes.data.entities.*;
     import br.com.certacon.msprocessefdcontribuicoes.data.repositories.*;
     import br.com.certacon.msprocessefdcontribuicoes.domain.entities.*;
+    import br.com.certacon.msprocessefdcontribuicoes.data.enums.ELinhaStatus;
+
     import org.springframework.beans.BeanUtils;
     import org.springframework.beans.factory.annotation.Autowired;
+    import org.springframework.stereotype.Service;
 
     import java.util.List;
 
@@ -320,10 +334,21 @@ function gerarServico(registros) {
 `;
     for (const registro of registros) {
         javaCode += `case "${registro}":\n`;
+        javaCode += `try{\n`;
         javaCode += `createRegistro_${registro}(linha);\n`;
+        javaCode += `}catch(Exception e){
+            linha.setStatus(ELinhaStatus.ERRO_CONVERSAO_REGISTRO);
+            linhaRepository.save(linha);
+        }
+            `;
+
         javaCode += `break;\n`;
     }
     javaCode += `
+    default:
+        linha.setStatus(ELinhaStatus.REGISTRO_NAO_ENCONTRADO);
+        linhaRepository.save(linha);
+        break;
 }
 
 }
@@ -337,6 +362,7 @@ return new ProcessEFDCResponse(true);
         javaCode += `BeanUtils.copyProperties(entity, dataEntity);\n`;
         javaCode += `registro_${registro}Repository.save(dataEntity);\n`;
         javaCode += `linha.setIdRegistro(dataEntity.getId());\n`;
+        javaCode += `linha.setStatus(ELinhaStatus.REGISTRO_VALIDO);\n`;
         javaCode += `linhaRepository.save(linha);\n`;
         javaCode += `}`;
 
